@@ -123,6 +123,12 @@ public: // attributes
   void
   setDescription(const std::string& description);
 
+  void
+  setMetric(uint64_t metric);
+
+  uint64_t
+  getMetric() const;
+
   /** \brief Get whether face is connected to a local app
    */
   bool
@@ -205,6 +211,7 @@ private:
   bool m_isOnDemand;
   const bool m_isMultiAccess;
   bool m_isFailed;
+  uint64_t m_metric;
 
   // allow setting FaceId
   friend class FaceTable;
@@ -314,6 +321,18 @@ Face::getLocalUri() const
 #define NFD_LOG_FACE_ERROR(msg) NFD_LOG_FACE(ERROR, msg)
 
 /** @} */
+
+inline void
+Face::setMetric(uint64_t metric)
+{
+  m_metric = metric;
+}
+
+inline uint64_t
+Face::getMetric() const
+{
+  return m_metric;
+}
 
 } // namespace nfd
 

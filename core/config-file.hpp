@@ -110,7 +110,7 @@ public:
   /**
    * \param config ConfigSection that needs to be processed
    * \param isDryRun true if performing a dry run of configuration, false otherwise
-   * \param filename logical filename of the config file, can appear in error messages
+   * \param filename optional convenience argument to provide more detailed error messages
    * \throws ConfigFile::Error if parse error
    */
   void
