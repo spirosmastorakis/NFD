@@ -27,6 +27,10 @@
 #include "core/logger.hpp"
 #include "core/random.hpp"
 #include "strategy.hpp"
+#include "face/null-face.hpp"
+
+#include "utils/ndn-ns3-packet-tag.hpp"
+
 #include <boost/random/uniform_int_distribution.hpp>
 
 namespace nfd {
@@ -43,8 +47,10 @@ Forwarder::Forwarder()
   , m_pit(m_nameTree)
   , m_measurements(m_nameTree)
   , m_strategyChoice(m_nameTree, fw::makeDefaultStrategy(*this))
+  , m_csFace(make_shared<NullFace>(FaceUri("contentstore://")))
 {
   fw::installStrategies(*this);
+  getFaceTable().addReserved(m_csFace, FACEID_CONTENT_STORE);
 }
 
 Forwarder::~Forwarder()
@@ -92,11 +98,22 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
   bool isPending = inRecords.begin() != inRecords.end();
   if (!isPending) {
     // CS lookup
-    const Data* csMatch = m_cs.find(interest);
+    const Data* csMatch;
+    shared_ptr<Data> match;
+    if (m_csFromNdnSim == nullptr)
+      csMatch = m_cs.find(interest);
+    else {
+      match = m_csFromNdnSim->Lookup(interest.shared_from_this());
+      csMatch = match.get();
+    }
     if (csMatch != 0) {
       const_cast<Data*>(csMatch)->setIncomingFaceId(FACEID_CONTENT_STORE);
       // XXX should we lookup PIT for other Interests that also match csMatch?
 
+      // invoke PIT satisfy callback
+      beforeSatisfyInterest(*pitEntry, *m_csFace, *csMatch);
+      this->dispatchToStrategy(pitEntry, bind(&Strategy::beforeSatisfyInterest, _1,
+                                              pitEntry, cref(*m_csFace), cref(*csMatch)));
       // set PIT straggler timer
       this->setStragglerTimer(pitEntry, true, csMatch->getFreshnessPeriod());
 
@@ -219,6 +236,7 @@ Forwarder::onInterestUnsatisfied(shared_ptr<pit::Entry> pitEntry)
   NFD_LOG_DEBUG("onInterestUnsatisfied interest=" << pitEntry->getName());
 
   // invoke PIT unsatisfied callback
+  beforeExpirePendingInterest(*pitEntry);
   this->dispatchToStrategy(pitEntry, bind(&Strategy::beforeExpirePendingInterest, _1,
                                           pitEntry));
 
@@ -267,8 +285,20 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
     return;
   }
 
+  // Remove Ptr<Packet> from the Data before inserting into cache, serving two purposes
+  // - reduce amount of memory used by cached entries
+  // - remove all tags that (e.g., hop count tag) that could have been associated with Ptr<Packet>
+  //
+  // Copying of Data is relatively cheap operation, as it copies (mostly) a collection of Blocks
+  // pointing to the same underlying memory buffer.
+  shared_ptr<Data> dataCopyWithoutPacket = make_shared<Data>(data);
+  dataCopyWithoutPacket->removeTag<ns3::ndn::Ns3PacketTag>();
+
   // CS insert
-  m_cs.insert(data);
+  if (m_csFromNdnSim == nullptr)
+    m_cs.insert(*dataCopyWithoutPacket);
+  else
+    m_csFromNdnSim->Add(dataCopyWithoutPacket);
 
   std::set<shared_ptr<Face> > pendingDownstreams;
   // foreach PitEntry
@@ -288,6 +318,7 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
     }
 
     // invoke PIT satisfy callback
+    beforeSatisfyInterest(*pitEntry, inFace, data);
     this->dispatchToStrategy(pitEntry, bind(&Strategy::beforeSatisfyInterest, _1,
                                             pitEntry, cref(inFace), cref(data)));
 
@@ -321,7 +352,10 @@ Forwarder::onDataUnsolicited(Face& inFace, const Data& data)
   bool acceptToCache = inFace.isLocal();
   if (acceptToCache) {
     // CS insert
-    m_cs.insert(data, true);
+    if (m_csFromNdnSim == nullptr)
+      m_cs.insert(data, true);
+    else
+      m_csFromNdnSim->Add(data.shared_from_this());
   }
 
   NFD_LOG_DEBUG("onDataUnsolicited face=" << inFace.getId() <<
