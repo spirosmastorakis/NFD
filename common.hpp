@@ -26,7 +26,7 @@
 #ifndef NFD_COMMON_HPP
 #define NFD_COMMON_HPP
 
-#include "config.hpp"
+//#include "config.hpp"
 
 #ifdef WITH_TESTS
 #define VIRTUAL_WITH_TESTS virtual
@@ -63,6 +63,7 @@
 #include <ndn-cxx/data.hpp>
 #include <ndn-cxx/util/face-uri.hpp>
 #include <ndn-cxx/util/signal.hpp>
+#include <ndn-cxx/link.hpp>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
@@ -98,6 +99,7 @@ using ndn::Name;
 using ndn::Exclude;
 using ndn::Block;
 using ndn::util::FaceUri;
+using ndn::Link;
 
 namespace tlv {
 // Don't write "namespace tlv = ndn::tlv", because NFD can add other members into this namespace.

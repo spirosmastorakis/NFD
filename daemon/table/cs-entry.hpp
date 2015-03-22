@@ -98,7 +98,7 @@ public: // exposed through ContentStore enumeration
    *  \pre hasData()
    */
   bool
-  canSatisfy(const Interest& interest) const;
+  canSatisfy(const Interest& interest);
 
 public: // used by generic ContentStore implementation
   /** \return true if a Data packet is stored
@@ -122,6 +122,29 @@ public: // used by generic ContentStore implementation
     this->setData(data.shared_from_this(), isUnsolicited);
   }
 
+  /** \return true if a Link object is stored
+   */
+  bool
+  hasLink() const
+  {
+    return m_link != nullptr;
+  }
+
+  /** \brief replaces the stored Data and Link
+   */
+  void
+  setDataAndLink(shared_ptr<const Data> data, shared_ptr<const Link> link, bool isUnsolicited);
+
+  /** \brief replaces the stored Data and Link
+   */
+  void
+  setDataAndLink(const Data& data, const Link& link, bool isUnsolicited)
+  {
+    this->setDataAndLink(data.shared_from_this(),
+                         static_pointer_cast<const Link>(link.shared_from_this()),
+                         isUnsolicited);
+  }
+
   /** \brief refreshes stale time relative to current time
    */
   void
@@ -135,6 +158,7 @@ public: // used by generic ContentStore implementation
 
 private:
   shared_ptr<const Data> m_data;
+  shared_ptr<const Link> m_link;
   bool m_isUnsolicited;
   time::steady_clock::TimePoint m_staleTime;
 };

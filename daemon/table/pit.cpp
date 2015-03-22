@@ -70,13 +70,25 @@ Pit::insert(const Interest& interest)
   BOOST_ASSERT(static_cast<bool>(nameTreeEntry));
 
   const std::vector<shared_ptr<pit::Entry>>& pitEntries = nameTreeEntry->getPitEntries();
+  auto it = pitEntries.begin();
 
-  // then check if this Interest is already in the PIT entries
-  auto it = std::find_if(pitEntries.begin(), pitEntries.end(),
-                         [&interest] (const shared_ptr<pit::Entry>& entry) {
-                           return entry->getInterest().getName() == interest.getName() &&
-                                  entry->getInterest().getSelectors() == interest.getSelectors();
+  if (interest.hasLink()) {
+    // then check if this Interest is already in the PIT entries
+    it = std::find_if(pitEntries.begin(), pitEntries.end(),
+                           [&interest] (const shared_ptr<pit::Entry>& entry) {
+                             return entry->getInterest().getName() == interest.getName() &&
+                                    entry->getInterest().getLink() == interest.getLink() &&
+                                    entry->getInterest().getSelectors() == interest.getSelectors();
                          });
+  }
+  else {
+    // then check if this Interest is already in the PIT entries
+    it = std::find_if(pitEntries.begin(), pitEntries.end(),
+                           [&interest] (const shared_ptr<pit::Entry>& entry) {
+                             return entry->getInterest().getName() == interest.getName() &&
+                                    entry->getInterest().getSelectors() == interest.getSelectors();
+                         });
+  }
   if (it != pitEntries.end()) {
     return { *it, false };
   }

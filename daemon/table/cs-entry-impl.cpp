@@ -41,6 +41,13 @@ EntryImpl::EntryImpl(shared_ptr<const Data> data, bool isUnsolicited)
   BOOST_ASSERT(!this->isQuery());
 }
 
+EntryImpl::EntryImpl(shared_ptr<const Data> data, shared_ptr<const Link> link, bool isUnsolicited)
+  : queueType(QUEUE_NONE)
+{
+  this->setDataAndLink(data, link, isUnsolicited);
+  BOOST_ASSERT(!this->isQuery());
+}
+
 bool
 EntryImpl::isQuery() const
 {

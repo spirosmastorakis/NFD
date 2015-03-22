@@ -54,6 +54,10 @@ public:
    */
   EntryImpl(shared_ptr<const Data> data, bool isUnsolicited);
 
+  /** \brief construct Entry for storage
+   */
+  EntryImpl(shared_ptr<const Data> data, shared_ptr<const Link> link, bool isUnsolicited);
+
   /** \return true if entry can become stale, false if entry is never stale
    */
   bool

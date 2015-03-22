@@ -68,6 +68,9 @@ public:
   bool
   insert(const Data& data, bool isUnsolicited = false);
 
+  bool
+  insert(const Data& data, const Link& link, bool isUnsolicited = false);
+
   /** \brief finds the best matching Data packet
    */
   const Data*

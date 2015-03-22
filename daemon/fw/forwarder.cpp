@@ -130,9 +130,37 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
   // FIB lookup
   shared_ptr<fib::Entry> fibEntry = m_fib.findLongestPrefixMatch(*pitEntry);
 
+  shared_ptr<fib::Entry> bestFibEntry = make_shared<fib::Entry>(Name());
+
+  if (fibEntry->getPrefix().empty() && interest.hasLink()) {
+    // Perform FIB lookup for the delegations
+    uint64_t minCost = std::numeric_limits<uint64_t>::max();
+    ndn::Link::DelegationSet delegationSet = interest.getLink().getDelegations();
+    for (const auto& delegation : delegationSet) {
+      fibEntry = m_fib.findLongestPrefixMatch(std::get<1>(delegation));
+      if (!fibEntry->getPrefix().empty()) {
+        const fib::NextHopList& nexthops = fibEntry->getNextHops();
+        for (auto nexthop : nexthops) {
+          if (nexthop.getCost() < minCost) {
+            minCost = nexthop.getCost();
+            if (bestFibEntry != fibEntry) {
+              bestFibEntry = fibEntry;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (bestFibEntry->getPrefix().empty()) {
   // dispatch to strategy
-  this->dispatchToStrategy(pitEntry, bind(&Strategy::afterReceiveInterest, _1,
-                                          cref(inFace), cref(interest), fibEntry, pitEntry));
+    this->dispatchToStrategy(pitEntry, bind(&Strategy::afterReceiveInterest, _1,
+                                            cref(inFace), cref(interest), fibEntry, pitEntry));
+  }
+  else {
+    this->dispatchToStrategy(pitEntry, bind(&Strategy::afterReceiveInterest, _1,
+                                            cref(inFace), cref(interest), bestFibEntry, pitEntry));
+  }
 }
 
 void
@@ -284,10 +312,19 @@ Forwarder::onIncomingData(Face& inFace, const Data& data)
   }
 
   // CS insert
-  if (m_csFromNdnSim == nullptr)
-    m_cs.insert(data);
-  else
+  if (m_csFromNdnSim == nullptr) {
+    if (pitMatches.at(0)->getInterest().hasLink()) {
+      // The matching PIT entries have a LINK object
+      m_cs.insert(data, pitMatches.at(0)->getInterest().getLink());
+    }
+    else {
+      // The matching PIT entries do not have a LINK object
+      m_cs.insert(data);
+    }
+  }
+  else {
     m_csFromNdnSim->Add(data.shared_from_this());
+  }
 
   std::set<shared_ptr<Face> > pendingDownstreams;
   // foreach PitEntry

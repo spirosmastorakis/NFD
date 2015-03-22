@@ -32,6 +32,17 @@ void
 Entry::setData(shared_ptr<const Data> data, bool isUnsolicited)
 {
   m_data = data;
+  m_link = nullptr;
+  m_isUnsolicited = isUnsolicited;
+
+  updateStaleTime();
+}
+
+void
+Entry::setDataAndLink(shared_ptr<const Data> data, shared_ptr<const Link> link, bool isUnsolicited)
+{
+  m_data = data;
+  m_link = link;
   m_isUnsolicited = isUnsolicited;
 
   updateStaleTime();
@@ -57,7 +68,7 @@ Entry::updateStaleTime()
 }
 
 bool
-Entry::canSatisfy(const Interest& interest) const
+Entry::canSatisfy(const Interest& interest)
 {
   BOOST_ASSERT(this->hasData());
   if (!interest.matchesData(*m_data)) {
@@ -66,6 +77,22 @@ Entry::canSatisfy(const Interest& interest) const
 
   if (interest.getMustBeFresh() == static_cast<int>(true) && this->isStale()) {
     return false;
+  }
+
+  if (interest.hasLink()) {
+    if (m_link != nullptr) {
+      if (*m_link != interest.getLink()) {
+        return false;
+      }
+    }
+    else {
+      return false;
+    }
+  }
+  else {
+    if (m_link != nullptr) {
+      return false;
+    }
   }
 
   return true;

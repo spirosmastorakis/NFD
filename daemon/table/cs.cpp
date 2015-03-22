@@ -97,6 +97,47 @@ Cs::insert(const Data& data, bool isUnsolicited)
   return true;
 }
 
+bool
+Cs::insert(const Data& data, const Link& link, bool isUnsolicited)
+{
+  NFD_LOG_DEBUG("insert " << data.getName());
+
+  // recognize CachingPolicy
+  using ndn::nfd::LocalControlHeader;
+  const LocalControlHeader& lch = data.getLocalControlHeader();
+  if (lch.hasCachingPolicy()) {
+    LocalControlHeader::CachingPolicy policy = lch.getCachingPolicy();
+    if (policy == LocalControlHeader::CachingPolicy::NO_CACHE) {
+      return false;
+    }
+  }
+
+  bool isNewEntry = false; TableIt it;
+  // use .insert because gcc46 does not support .emplace
+  std::tie(it, isNewEntry) = m_table.insert(EntryImpl(data.shared_from_this(),
+                                                      make_shared<Link>(link),
+                                                      isUnsolicited));
+  EntryImpl& entry = const_cast<EntryImpl&>(*it);
+
+  if (!isNewEntry) { // existing entry
+    this->detachQueue(it);
+    // XXX This doesn't forbid unsolicited Data from refreshing a solicited entry.
+    if (entry.isUnsolicited() && !isUnsolicited) {
+      entry.unsetUnsolicited();
+    }
+  }
+  entry.updateStaleTime();
+  this->attachQueue(it);
+
+  // check there are same amount of entries in the table and in queues
+  BOOST_ASSERT(m_table.size() == std::accumulate(m_queues, m_queues + QUEUE_MAX, 0U,
+      [] (size_t sum, const Queue queue) { return sum + queue.size(); }));
+
+  this->evict(); // XXX The new entry could be evicted, but it shouldn't matter.
+
+  return true;
+}
+
 const Data*
 Cs::find(const Interest& interest) const
 {
