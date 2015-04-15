@@ -128,19 +128,26 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
   this->setUnsatisfyTimer(pitEntry);
 
   // FIB lookup
-  shared_ptr<fib::Entry> fibEntry = m_fib.findLongestPrefixMatch(*pitEntry);
+  // shared_ptr<fib::Entry> fibEntry = m_fib.findLongestPrefixMatch(*pitEntry);
 
   shared_ptr<fib::Entry> bestFibEntry = make_shared<fib::Entry>(Name());
 
-  if (fibEntry->getPrefix().empty() && interest.hasLink()) {
+  // NFD_LOG_DEBUG("Best Entry=" << fibEntry->getPrefix());
+
+  // if (fibEntry->getNextHops().empty() && interest.hasLink()) {
+  if (interest.hasLink()) {
     // Perform FIB lookup for the delegations
     uint64_t minCost = std::numeric_limits<uint64_t>::max();
+    // NFD_LOG_DEBUG("here");
     ndn::Link::DelegationSet delegationSet = interest.getLink().getDelegations();
+    // NFD_LOG_DEBUG("there");
     for (const auto& delegation : delegationSet) {
-      fibEntry = m_fib.findLongestPrefixMatch(std::get<1>(delegation));
+      shared_ptr<fib::Entry> fibEntry = m_fib.findLongestPrefixMatch(std::get<1>(delegation));
+      NFD_LOG_DEBUG("Fib entry=" << fibEntry->getPrefix());
       if (!fibEntry->getPrefix().empty()) {
         const fib::NextHopList& nexthops = fibEntry->getNextHops();
         for (auto nexthop : nexthops) {
+          NFD_LOG_DEBUG("Next hop cost=" << nexthop.getCost());
           if (nexthop.getCost() < minCost) {
             minCost = nexthop.getCost();
             if (bestFibEntry != fibEntry) {
@@ -152,8 +159,10 @@ Forwarder::onIncomingInterest(Face& inFace, const Interest& interest)
     }
   }
 
+  NFD_LOG_DEBUG("Best Entry=" << bestFibEntry->getPrefix());
   if (bestFibEntry->getPrefix().empty()) {
   // dispatch to strategy
+    shared_ptr<fib::Entry> fibEntry = m_fib.findLongestPrefixMatch(*pitEntry);
     this->dispatchToStrategy(pitEntry, bind(&Strategy::afterReceiveInterest, _1,
                                             cref(inFace), cref(interest), fibEntry, pitEntry));
   }

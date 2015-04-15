@@ -76,9 +76,11 @@ Pit::insert(const Interest& interest)
     // then check if this Interest is already in the PIT entries
     it = std::find_if(pitEntries.begin(), pitEntries.end(),
                            [&interest] (const shared_ptr<pit::Entry>& entry) {
+                           if (entry->getInterest().hasLink()) {
                              return entry->getInterest().getName() == interest.getName() &&
                                     entry->getInterest().getLink() == interest.getLink() &&
                                     entry->getInterest().getSelectors() == interest.getSelectors();
+                           }
                          });
   }
   else {
